@@ -51,7 +51,6 @@
 
 //! parameters
 bool read_from_topic = true, read_from_camera = false;
-// double nearbyradius = 1.0;
 //Publish
 ros::Publisher pub_cloud;
 ros::Publisher pub_map_cloud;
@@ -391,33 +390,36 @@ inline bool isInteger(const std::string & s){
 	return (*p == 0);
 }
 
-void LoadImages(const string &strPathToSequence, vector<string> &vstrImageFilenames, vector<double> &vTimestamps){
-	ifstream fTimes;
-	string strPathTimeFile = strPathToSequence + "/timestamps.txt";
-	fTimes.open(strPathTimeFile.c_str());
-	while (!fTimes.eof()){
-		string s;
-		getline(fTimes, s);
-		if (!s.empty()){
-			stringstream ss;
-			ss << s;
-			double t;
-			ss >> t;
-			vTimestamps.push_back(t);
-		}
-	}
+void LoadImages(const string &strPathToSequence, vector<string> &vstrImageFilenames, vector<double> &vTimestamps)
+{
+    ifstream fTimes;
+    string strPathTimeFile = strPathToSequence + "/times.txt";
+    fTimes.open(strPathTimeFile.c_str());
+    while(!fTimes.eof())
+    {
+        string s;
+        getline(fTimes,s);
+        if(!s.empty())
+        {
+            stringstream ss;
+            ss << s;
+            double t;
+            ss >> t;
+            vTimestamps.push_back(t);
+        }
+    }
 
-	string strPrefixLeft = strPathToSequence + "/data/";
+    string strPrefixLeft = strPathToSequence + "/image_0/";
 
-	const int nTimes = vTimestamps.size();
-	vstrImageFilenames.resize(nTimes);
+    const int nTimes = vTimestamps.size();
+    vstrImageFilenames.resize(nTimes);
 
-	for (int i = 0; i < nTimes; i++)
-	{
-		stringstream ss;
-		ss << setfill('0') << setw(10) << i;
-		vstrImageFilenames[i] = strPrefixLeft + ss.str() + ".png";
-	}
+    for(int i=0; i<nTimes; i++)
+    {
+        stringstream ss;
+        ss << setfill('0') << setw(6) << i;
+        vstrImageFilenames[i] = strPrefixLeft + ss.str() + ".png";
+    }
 }
 
 void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg){

@@ -76,6 +76,7 @@ public:
 
 
 public:
+	bool loop_detected;
 
     // Tracking states
     enum eTrackingState{
@@ -113,6 +114,10 @@ public:
     // True if local mapping is deactivated and we are performing only localization
     bool mbOnlyTracking;
 
+    // True if use the IMU Integrator
+    bool mbUseIMU;
+    float yaw_angle_accums;
+
     void Reset();
 
 protected:
@@ -126,6 +131,13 @@ protected:
     // Map initialization for monocular
     void MonocularInitialization();
     void CreateInitialMapMonocular();
+
+    // Map initialization for stereo and RGB-D when reloading a map.
+    void StereoInitializationWithMap();
+
+    // Map initialization for monocular when reloading a map.
+    void MonocularInitializationWithMap();
+
 
     void CheckReplacedInLastFrame();
     bool TrackReferenceKeyFrame();
