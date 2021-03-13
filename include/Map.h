@@ -23,34 +23,53 @@
 
 #include "MapPoint.h"
 #include "KeyFrame.h"
+#include "Converter.h"
+#include "SystemSetting.h"
+#include "InitKeyFrame.h"
+#include "KeyFrameDatabase.h" //When loading the map, we need to add KeyFrame to KeyFrameDatabase.
 #include <set>
+#include "Frame.h" // Used for initializing frame.nNextId and mnId
 
 #include <mutex>
 
-
+using namespace std;
 
 namespace ORB_SLAM2
 {
 
 class MapPoint;
 class KeyFrame;
+class SystemSetting;
+class KeyFrameDatabase;
 
 class Map
 {
 public:
     Map();
 
+	bool SaveText(const string &filename);
+	bool SaveWithTimestamps(const string &filename);
+	bool SaveWithPose(const string &filename);
+
+	void _WriteMapPoint(ofstream &f, MapPoint* mp,
+		const std::string &end_marker = "\n");
+	void _WriteMapPointObj(ofstream &f, MapPoint* mp, 
+		const std::string &end_marker="\n");
+
     void AddKeyFrame(KeyFrame* pKF);
     void AddMapPoint(MapPoint* pMP);
     void EraseMapPoint(MapPoint* pMP);
+    void EraseNearbyMapPoint(MapPoint* pMP);    
     void EraseKeyFrame(KeyFrame* pKF);
     void SetReferenceMapPoints(const std::vector<MapPoint*> &vpMPs);
     void InformNewBigChange();
     int GetLastBigChangeIdx();
+    void ResetNearbyPoint();
 
     std::vector<KeyFrame*> GetAllKeyFrames();
     std::vector<MapPoint*> GetAllMapPoints();
     std::vector<MapPoint*> GetReferenceMapPoints();
+    std::vector<MapPoint*> GetNearbyMapPoints();
 
     long unsigned int MapPointsInMap();
     long unsigned  KeyFramesInMap();
@@ -60,13 +79,25 @@ public:
     void clear();
 
     vector<KeyFrame*> mvpKeyFrameOrigins;
-
+    std::set<MapPoint*> nearbyMapPoints; // map points nearby camera
     std::mutex mMutexMapUpdate;
 
     // This avoid that two points are created simultaneously in separate threads (id conflict)
     std::mutex mMutexPointCreation;
 
+    // Save map information into a binary file.
+    void Save( const string &filename );
+
+    // Load map from a binary file.
+    void Load( const string &filename, SystemSetting* mySystemSetting, KeyFrameDatabase* mpKeyFrameDatabase);
+    MapPoint* LoadMapPoint( ifstream &f );
+    KeyFrame* LoadKeyFrame( ifstream &f, SystemSetting* mySystemSetting );
+
 protected:
+
+    void SaveMapPoint( ofstream &f, MapPoint* mp );
+    void SaveKeyFrame( ofstream &f, KeyFrame* kf );
+
     std::set<MapPoint*> mspMapPoints;
     std::set<KeyFrame*> mspKeyFrames;
 
@@ -78,6 +109,11 @@ protected:
     int mnBigChangeIdx;
 
     std::mutex mMutexMap;
+
+    // It saves the Index of the MapPoints that matches the ORB featurepoint
+    std::map<MapPoint*, unsigned long int> mmpnMapPointsIdx; 
+    void GetMapPointsIdx();
+    void SaveFrameID( ofstream &f );
 };
 
 } //namespace ORB_SLAM

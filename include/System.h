@@ -59,6 +59,14 @@ public:
 
 public:
 
+	Map* getMap() {
+		return mpMap;
+	}
+	Tracking* getTracker(){ return mpTracker; }
+	LocalMapping* getLocalMapping(){ return mpLocalMapper; }
+	LoopClosing* getLoopClosing(){ return mpLoopCloser; }
+
+
     // Initialize the SLAM system. It launches the Local Mapping, Loop Closing and Viewer threads.
     System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor, const bool bUseViewer = true);
 
@@ -66,6 +74,7 @@ public:
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
     // Returns the camera pose (empty if tracking fails).
     cv::Mat TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp);
+    cv::Mat TrackStereoWithIMU(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp, const float current_yaw_angle_accums);
 
     // Process the given rgbd frame. Depthmap must be registered to the RGB frame.
     // Input image: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
@@ -113,15 +122,28 @@ public:
     // See format details at: http://www.cvlibs.net/datasets/kitti/eval_odometry.php
     void SaveTrajectoryKITTI(const string &filename);
 
+	void Save2dMapPointsTUM(const string &filename, const int x, const int y);
+	void SaveGridMapTUM(const string &filename);
+
+
+
     // TODO: Save/Load functions
     // SaveMap(const string &filename);
+    void SaveMap(const string &filename); 
+
     // LoadMap(const string &filename);
+    void LoadMap(const string &filename, SystemSetting* mySystemSetting);
 
     // Information from most recent processed frame
     // You can call this right after TrackMonocular (or stereo or RGBD)
     int GetTrackingState();
     std::vector<MapPoint*> GetTrackedMapPoints();
     std::vector<cv::KeyPoint> GetTrackedKeyPointsUn();
+
+    // Self defined pointer to save images on my disk:
+    void SetSaveImageFlag();
+    void SetViewerIMUFlagTrue();
+    void SetViewerIMUFlagFalse();
 
 private:
 
@@ -175,6 +197,8 @@ private:
     std::vector<MapPoint*> mTrackedMapPoints;
     std::vector<cv::KeyPoint> mTrackedKeyPointsUn;
     std::mutex mMutexState;
+
+    std::string mySettingsFile;
 };
 
 }// namespace ORB_SLAM
