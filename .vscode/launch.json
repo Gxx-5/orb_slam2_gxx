@@ -1,0 +1,29 @@
+{
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "orb_slam2_ros_rgbd",
+                "type": "cppdbg",
+                "request": "launch",
+                "program": "${workspaceFolder}/devel/.private/orb_slam2_ros/lib/orb_slam2_ros/orb_slam2_ros_rgbd",
+                "args": [
+                    "_model:=RS16",
+                    "_resolution_type:=1.0cm"
+                ],
+                "stopAtEntry": false,
+                "cwd": "${workspaceFolder}",
+                "environment": [],
+                "externalConsole": false,
+                "preLaunchTask": "prerun",
+                "MIMode": "gdb",
+                "avoidWindowsConsoleRedirection": true,
+                "setupCommands": [
+                    {
+                        "description": "Enable pretty-printing for gdb",
+                        "text": "-enable-pretty-printing",
+                        "ignoreFailures": true
+                    }
+                ]
+            }
+        ]
+    }

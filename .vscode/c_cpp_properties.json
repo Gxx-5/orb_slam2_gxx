@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/opt/ros/melodic/include",
+                "/usr/include",
+                "/usr/include/pcl-1.8",
+                "/usr/include/eigen3/",
+                "include"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11", //"gnu11",
+            "cppStandard": "c++14", //"gnu++14",
+            "intelliSenseMode": "gcc-x64"
+            // "compileCommands": "${workspaceFolder}/build/orb_slam2_ros/compile_commands.json"
+        }
+    ],
+    "version": 4
+}
