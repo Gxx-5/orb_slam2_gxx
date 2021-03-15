@@ -2,7 +2,8 @@
 
 ROS_PUB::ROS_PUB(int argc, char **argv){
         ros::init(argc,argv,"rospub");
-        init_publisher();
+	ros::NodeHandle nodeHandler;
+        init_publisher(nodeHandler);
         cout << "Initialize node rospub inside class Done.";
 }
 
@@ -11,7 +12,7 @@ ROS_PUB::~ROS_PUB(){
         cout << "Node rospub has been shutdown!";
 }
 
-void ROS_PUB::init_publisher(){	
+void ROS_PUB::init_publisher(ros::NodeHandle nodeHandler){	
         pub_cloud = nodeHandler.advertise<sensor_msgs::PointCloud2>("/ros_cloud", 1000);
         pub_pts_and_pose = nodeHandler.advertise<geometry_msgs::PoseArray>("pts_and_pose", 1000);
         pub_all_kf_and_pts = nodeHandler.advertise<geometry_msgs::PoseArray>("all_kf_and_pts", 1000);
@@ -175,7 +176,6 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud_(new pcl::PointCloud<pcl::PointXYZ
 		ros_cloud.header.frame_id = map_frame_id_param_; // "map"
 		// ros_cloud.header.seq = ni;
 		pub_cloud.publish(ros_cloud);
-		cout << "pub_cloud.publish(ros_cloud);" << endl;
 
 		pt_array.header.frame_id = map_frame_id_param_;// "map"
 		// pt_array.header.seq = frame_id + 1;

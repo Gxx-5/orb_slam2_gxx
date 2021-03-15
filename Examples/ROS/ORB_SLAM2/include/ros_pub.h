@@ -31,10 +31,9 @@ public:
 	// Function declaration
 	ROS_PUB(int argc, char **argv);
 	~ROS_PUB();
-	void init_publisher();
+	void init_publisher(ros::NodeHandle nodeHandler);
 	void publish(ORB_SLAM2::System &SLAM);
 	bool getRosParams(ros::NodeHandle &node_handle_);
 	vector<float> QuaternionDotProduct(vector<float> q1,vector<float> q2);
 	geometry_msgs::Pose TransformtoWorld(geometry_msgs::Pose camera_pose);
-	ros::NodeHandle nodeHandler;
 };
