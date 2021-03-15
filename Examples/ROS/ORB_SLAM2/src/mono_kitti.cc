@@ -28,6 +28,7 @@
 #include<opencv2/core/core.hpp>
 
 #include"System.h"
+#include"../include/ros_pub.h"
 
 using namespace std;
 
@@ -49,8 +50,9 @@ int main(int argc, char **argv)
 
     int nImages = vstrImageFilenames.size();
 
+    ROS_PUB rospub(argc,argv);
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true);
+    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,rospub.bUseViewer_);    
 
     // Vector for tracking time statistics
     vector<float> vTimesTrack;
@@ -83,6 +85,7 @@ int main(int argc, char **argv)
 
         // Pass the image to the SLAM system
         SLAM.TrackMonocular(im,tframe);
+        rospub.publish(SLAM);
 
 #ifdef COMPILEDWITHC11
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();

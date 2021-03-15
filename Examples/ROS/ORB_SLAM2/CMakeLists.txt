@@ -73,11 +73,20 @@ target_link_libraries(Mono
 ${LIBS}
 )
 
-rosbuild_add_executable(Monopub
-src/ros_mono_pub.cc
+# rosbuild_add_executable(Monopub
+# src/ros_mono_pub.cc
+# )
+
+# target_link_libraries(Monopub
+# ${LIBS}
+# )
+
+rosbuild_add_executable(rospub
+src/ros_pub.cc
+src/mono_kitti.cc
 )
 
-target_link_libraries(Monopub
+target_link_libraries(rospub
 ${LIBS}
 )
 
@@ -110,11 +119,11 @@ target_link_libraries(RGBD
 ${LIBS}
 )
 
-rosbuild_add_executable(RGBDpub
-src/ros_rgbd_pub.cc
-)
+# rosbuild_add_executable(RGBDpub
+# src/ros_rgbd_pub.cc
+# )
 
-target_link_libraries(RGBDpub
-${LIBS}
-)
+# target_link_libraries(RGBDpub
+# ${LIBS}
+# )
 

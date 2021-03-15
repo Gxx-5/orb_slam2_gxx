@@ -2,11 +2,11 @@
         "version": "0.2.0",
         "configurations": [
             {
-                "name": "Monopub",
+                "name": "mono_kitti",
                 "type": "cppdbg",
                 "request": "launch",
-                "program": "${workspaceFolder}/Examples/ROS/ORB_SLAM2/Monopub",
-                // "program": "${workspaceFolder}/devel/.private/orb_slam2_ros/lib/orb_slam2_ros/orb_slam2_ros_rgbd",
+                "program": "${workspaceFolder}/Examples/ROS/ORB_SLAM2/rospub",
+                // "program": "${workspaceFolder}/Examples/ROS/ORB_SLAM2/Monopub",
                 "args": [
                     "/home/gxx/WorkSpace/ORB_SLAM2/Vocabulary/ORBvoc.txt",
                     "/home/gxx/WorkSpace/ORB_SLAM2/Examples/Monocular/KITTI00-02.yaml",
