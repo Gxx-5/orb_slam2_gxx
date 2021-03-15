@@ -4,16 +4,13 @@
         {
             "label": "prerun",
             "type": "shell",
-            "command": "source ./devel/setup.zsh && rosparam load ${workspaceFolder}/src/orb_slam_2_ros/ros/config/param.yaml"
+            "command": "source ${workspaceFolder}/Examples/ROS/ORB_SLAM2/build/devel/setup.zsh"
+            // "command": "source ./devel/setup.zsh && rosparam load ${workspaceFolder}/src/orb_slam_2_ros/ros/config/param.yaml"
         },
         {
-            "label": "catkin build",
+            "label": "build",
             "type": "shell",
-            "command": "catkin",
-            "args": [
-                "build",
-                "-DCMAKE_BUILD_TYPE=Debug"
-            ],
+            "command": "cd ${workspaceFolder}/Examples/ROS/ORB_SLAM2/build && make",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -31,10 +28,6 @@
                 "clean",
                 "-y"
             ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
             "presentation": {
                 "reveal": "always"
             },

@@ -768,7 +768,8 @@ namespace ORB_SLAM2
 
 	void System::SaveMap(const string &filename)  
 	{  
-	    mpMap->Save(filename);
+		cout << "SaveMap module has been removed artificially!";
+	//     mpMap->Save(filename);
 	}
 
 	// void System::LoadMap(const string &filename,SystemSetting* mySystemSetting)  

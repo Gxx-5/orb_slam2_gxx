@@ -35,7 +35,6 @@
 #include "visualization_msgs/MarkerArray.h"
 #include "visualization_msgs/Marker.h"
 
-
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -47,16 +46,22 @@
 #include <opencv2/highgui/highgui_c.h>
 #include <opencv2/highgui/highgui.hpp>
 #include <Converter.h>
-// #include "CalCost.h"
+
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+
 
 //! parameters
 bool read_from_topic = true, read_from_camera = false;
+std::string name_of_node_;
+std::string map_frame_id_param_ = "map";
+std::string camera_frame_id_param_ = "camera_link";
+std::string map_file_name_param_;
+bool bUseViewer_ =true;
 //Publish
 ros::Publisher pub_cloud;
-ros::Publisher pub_map_cloud;
-ros::Publisher pub_cur_view_cloud;
-ros::Publisher vis_pub,vis_text_pub;
-ros::Publisher costcloud_pub;
+ros::Publisher pub_cloud_;
+ros::Publisher pub_cam_pose_;
 bool save_to_results = false;
 std::string image_topic = "/camera/image_raw";
 int all_pts_pub_gap = 0;
@@ -75,24 +80,27 @@ void LoadImages(const string &strSequence, vector<string> &vstrImageFilenames,
 	vector<double> &vTimestamps);
 inline bool isInteger(const std::string & s);
 void publish(ORB_SLAM2::System &SLAM, ros::Publisher &pub_pts_and_pose,
-			 ros::Publisher &pub_all_kf_and_pts, ros::Publisher &pub_cur_camera_pose, int frame_id);
+			 ros::Publisher &pub_all_kf_and_pts, ros::Publisher &pub_cam_pose, int frame_id);
+bool parseParams(int argc, char **argv);
+bool getRosParams(ros::NodeHandle &node_handle_);
+vector<float> QuaternionDotProduct(vector<float> q1,vector<float> q2);
+geometry_msgs::Pose TransformtoWorld(geometry_msgs::Pose camera_pose);
 
 class ImageGrabber{
 public:
 	ImageGrabber(ORB_SLAM2::System &_SLAM, ros::Publisher &_pub_pts_and_pose,
-		ros::Publisher &_pub_all_kf_and_pts, ros::Publisher &_pub_cur_camera_pose) :
+		ros::Publisher &_pub_all_kf_and_pts, ros::Publisher &_pub_cam_pose) :
 		SLAM(_SLAM), pub_pts_and_pose(_pub_pts_and_pose),
-		pub_all_kf_and_pts(_pub_all_kf_and_pts), pub_cur_camera_pose(_pub_cur_camera_pose), frame_id(0){}
+		pub_all_kf_and_pts(_pub_all_kf_and_pts), pub_cam_pose(_pub_cam_pose), frame_id(0){}
 
 	void GrabImage(const sensor_msgs::ImageConstPtr& msg);
 
 	ORB_SLAM2::System &SLAM;
 	ros::Publisher &pub_pts_and_pose;
 	ros::Publisher &pub_all_kf_and_pts;
-	ros::Publisher &pub_cur_camera_pose;
+	ros::Publisher &pub_cam_pose;
 	int frame_id;
 };
-bool parseParams(int argc, char **argv);
 
 using namespace std;
 
@@ -102,18 +110,23 @@ int main(int argc, char **argv){
 	if (!parseParams(argc, argv)) {
 		return EXIT_FAILURE;
 	}
+	cout << "Monopub" << endl;
 	int n_images = vstrImageFilenames.size();
-
-	// Create SLAM system. It initializes all system threads and gets ready to process frames.
-	ORB_SLAM2::System SLAM(argv[1], argv[2], ORB_SLAM2::System::MONOCULAR, true);
 	ros::NodeHandle nodeHandler;
-	pub_cloud = nodeHandler.advertise<sensor_msgs::PointCloud>("/cur_kp_cloud", 1000);
+	// getRosParams(nodeHandler);
+	// Create SLAM system. It initializes all system threads and gets ready to process frames.
+	ORB_SLAM2::System SLAM(argv[1], argv[2], ORB_SLAM2::System::MONOCULAR, bUseViewer_);
+
+	// pub_cloud = nodeHandler.advertise<sensor_msgs::PointCloud>("/ros_cloud", 1000);
+	pub_cloud = nodeHandler.advertise<sensor_msgs::PointCloud2>("/ros_cloud", 1000);
+	pub_cloud_ = nodeHandler.advertise<sensor_msgs::PointCloud2>("/ros_cloud_rotated", 1000);
 	ros::Publisher pub_pts_and_pose = nodeHandler.advertise<geometry_msgs::PoseArray>("pts_and_pose", 1000);
 	ros::Publisher pub_all_kf_and_pts = nodeHandler.advertise<geometry_msgs::PoseArray>("all_kf_and_pts", 1000);
-	ros::Publisher pub_cur_camera_pose = nodeHandler.advertise<geometry_msgs::PoseStamped>("/cur_camera_pose", 1000);
+	ros::Publisher pub_cam_pose = nodeHandler.advertise<geometry_msgs::PoseStamped>("/cam_pose_rotated", 1000);
+	pub_cam_pose_ = nodeHandler.advertise<geometry_msgs::PoseStamped>("/cam_pose", 1000);
 
 	if (read_from_topic) {
-		ImageGrabber igb(SLAM, pub_pts_and_pose, pub_all_kf_and_pts, pub_cur_camera_pose);
+		ImageGrabber igb(SLAM, pub_pts_and_pose, pub_all_kf_and_pts, pub_cam_pose);
 		ros::Subscriber sub = nodeHandler.subscribe(image_topic, 1, &ImageGrabber::GrabImage, &igb);
 		ros::spin();
 	}
@@ -151,7 +164,7 @@ int main(int argc, char **argv){
 			// Pass the image to the SLAM system
 			cv::Mat curr_pose = SLAM.TrackMonocular(im, tframe);
 
-			publish(SLAM, pub_pts_and_pose, pub_all_kf_and_pts, pub_cur_camera_pose, frame_id);
+			publish(SLAM, pub_pts_and_pose, pub_all_kf_and_pts, pub_cam_pose, frame_id);
 
 			//cv::imshow("Press escape to exit", im);
 			//if (cv::waitKey(1) == 27) {
@@ -163,16 +176,16 @@ int main(int argc, char **argv){
 		}
 	}
 	//ros::spin();
-	if(save_to_results){
-		mkdir("results", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-		SLAM.getMap()->Save("results//map_pts_out.obj");
-		SLAM.getMap()->SaveWithTimestamps("results//map_pts_and_keyframes.txt");
-		// Save camera trajectory
-		SLAM.SaveKeyFrameTrajectoryTUM("results//key_frame_trajectory.txt");
+	// if(save_to_results){
+	// 	mkdir("results", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+	// 	SLAM.getMap()->Save("results//map_pts_out.obj");
+	// 	SLAM.getMap()->SaveWithTimestamps("results//map_pts_and_keyframes.txt");
+	// 	// Save camera trajectory
+	// 	SLAM.SaveKeyFrameTrajectoryTUM("results//key_frame_trajectory.txt");
 
-		cout << "Press 'q' in the Frame Window to quit!" << endl;
-		while (cv::waitKey(0) != 'q') { }
-	}
+	// 	cout << "Press 'q' in the Frame Window to quit!" << endl;
+	// 	while (cv::waitKey(0) != 'q') { }
+	// }
 	// Stop all threads
 	SLAM.Shutdown();
 	//geometry_msgs::PoseArray pt_array;
@@ -183,7 +196,7 @@ int main(int argc, char **argv){
 }
 
 void publish(ORB_SLAM2::System &SLAM, ros::Publisher &pub_pts_and_pose,
-			 ros::Publisher &pub_all_kf_and_pts, ros::Publisher &pub_cur_camera_pose, int frame_id) {
+			 ros::Publisher &pub_all_kf_and_pts, ros::Publisher &pub_cam_pose, int frame_id) {
 	if (all_pts_pub_gap>0 && pub_count >= all_pts_pub_gap) {
 		pub_all_pts = true;
 		pub_count = 0;
@@ -249,11 +262,10 @@ void publish(ORB_SLAM2::System &SLAM, ros::Publisher &pub_pts_and_pose,
 		geometry_msgs::Pose n_kf_msg;
 		n_kf_msg.position.x = n_kf_msg.position.y = n_kf_msg.position.z = n_kf;
 		kf_pt_array.poses[0] = n_kf_msg;
-		kf_pt_array.header.frame_id = "map";
+		kf_pt_array.header.frame_id = map_frame_id_param_;// "map"
 		// kf_pt_array.header.seq = frame_id + 1;
 		printf("Publishing data for %u keyfranmes\n", n_kf);
 		pub_all_kf_and_pts.publish(kf_pt_array);
-		SLAM.getMap()->ResetNearbyPoint();//when loop closure detected,reset nearbypoints to map points(all)
 	}
 	else if (SLAM.getTracker()->mCurrentFrame.is_keyframe) {
 		++pub_count;
@@ -284,13 +296,15 @@ void publish(ORB_SLAM2::System &SLAM, ros::Publisher &pub_pts_and_pose,
 
 		vector<float> q = ORB_SLAM2::Converter::toQuaternion(Rwc);
 		//geometry_msgs::Pose camera_pose;
-		// std::vector<ORB_SLAM2::MapPoint*> all_map_points = SLAM.getMap()->GetAllMapPoints();
-		std::vector<ORB_SLAM2::MapPoint*> map_points = SLAM.GetTrackedMapPoints();
-		int n_map_pts = map_points.size();
-		// int all_map_pts = all_map_points.size();
 
-		// printf("\ntracked_map_pts: %d\n", n_map_pts);
-		// printf("all_map_pts: %d\n", all_map_pts);
+		std::vector<ORB_SLAM2::MapPoint*> map_points = SLAM.getMap()->GetAllMapPoints();
+		int n_map_pts = map_points.size();
+		printf("all_map_pts: %d\n", n_map_pts);
+
+		// std::vector<ORB_SLAM2::MapPoint*> map_points = SLAM.GetTrackedMapPoints();
+		// int n_map_pts = map_points.size();
+		// printf("tracked_map_pts: %d\n", n_map_pts);
+		
 
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud(new pcl::PointCloud<pcl::PointXYZ>);
 
@@ -311,7 +325,7 @@ void publish(ORB_SLAM2::System &SLAM, ros::Publisher &pub_pts_and_pose,
 		pt_array.poses.push_back(camera_pose);
 
 		//printf("Done getting camera pose\n");
-
+pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud_(new pcl::PointCloud<pcl::PointXYZ>);
 		for (int pt_id = 1; pt_id <= n_map_pts; ++pt_id){
 
 			if (!map_points[pt_id - 1] || map_points[pt_id - 1]->isBad()) {
@@ -327,6 +341,8 @@ void publish(ORB_SLAM2::System &SLAM, ros::Publisher &pub_pts_and_pose,
 			geometry_msgs::Pose curr_pt;
 			//printf("wp size: %d, %d\n", wp.rows, wp.cols);
 			pcl_cloud->push_back(pcl::PointXYZ(wp.at<float>(0), wp.at<float>(1), wp.at<float>(2)));
+			// transform cloud from camera coordinate to world coordinate.
+			pcl_cloud_->push_back(pcl::PointXYZ(wp.at<float>(2), -wp.at<float>(0), -wp.at<float>(1)));			
 			curr_pt.position.x = wp.at<float>(0);
 			curr_pt.position.y = wp.at<float>(1);
 			curr_pt.position.z = wp.at<float>(2);
@@ -336,16 +352,21 @@ void publish(ORB_SLAM2::System &SLAM, ros::Publisher &pub_pts_and_pose,
 
 		sensor_msgs::PointCloud2 ros_cloud;
 		pcl::toROSMsg(*pcl_cloud, ros_cloud);
-		ros_cloud.header.frame_id = "map";
+		ros_cloud.header.frame_id = map_frame_id_param_; // "map"
 		// ros_cloud.header.seq = ni;
+		pub_cloud.publish(ros_cloud);
 
-		// printf("valid map pts: %lu\n", pt_array.poses.size()-1);				
-		// printf("ros_cloud size: %d x %d\n", ros_cloud.height, ros_cloud.width);
-		sensor_msgs::PointCloud ros_cloud1;
-		sensor_msgs::convertPointCloud2ToPointCloud(ros_cloud,ros_cloud1);
-		pub_cloud.publish(ros_cloud1);
+		sensor_msgs::PointCloud2 ros_cloud_;
+		pcl::toROSMsg(*pcl_cloud_, ros_cloud_);
+		ros_cloud_.header.frame_id = map_frame_id_param_; // "map"
+		// ros_cloud.header.seq = ni;
+		pub_cloud_.publish(ros_cloud_);
 
-		pt_array.header.frame_id = "map";
+		// sensor_msgs::PointCloud ros_cloud1;
+		// sensor_msgs::convertPointCloud2ToPointCloud(ros_cloud,ros_cloud1);
+		// pub_cloud.publish(ros_cloud1);
+
+		pt_array.header.frame_id = map_frame_id_param_;// "map"
 		pt_array.header.seq = frame_id + 1;
 		pub_pts_and_pose.publish(pt_array);
 		// pub_kf.publish(camera_pose);
@@ -359,21 +380,53 @@ void publish(ORB_SLAM2::System &SLAM, ros::Publisher &pub_pts_and_pose,
 		cv::Mat twc = -Rwc*Tcw.rowRange(0, 3).col(3);
 
 		vector<float> q = ORB_SLAM2::Converter::toQuaternion(Rwc);
-		
-		camera_pose.position.x = twc.at<float>(0);
-		camera_pose.position.y = twc.at<float>(1);
-		camera_pose.position.z = twc.at<float>(2);
 
 		camera_pose.orientation.x = q[0];
 		camera_pose.orientation.y = q[1];
 		camera_pose.orientation.z = q[2];
-		camera_pose.orientation.w = q[3];
+		camera_pose.orientation.w = q[3];		
+				
+		// camera_pose.position.x = twc.at<float>(0);
+		// camera_pose.position.y = twc.at<float>(1);
+		// camera_pose.position.z = twc.at<float>(2);
+		// transform camera_pose from camera coordinate to world coordinate.
+		camera_pose.position.x = twc.at<float>(2);
+		camera_pose.position.y = -twc.at<float>(0);
+		camera_pose.position.z = -twc.at<float>(1);
+
+		geometry_msgs::PoseStamped camera_posestamped_;
+		camera_posestamped_.pose = camera_pose;
+		camera_posestamped_.header.frame_id = map_frame_id_param_; //"map""
+		camera_posestamped_.header.stamp = ros::Time::now();
+		pub_cam_pose_.publish(camera_posestamped_);
+
+		Eigen::Quaterniond quat(q[3], q[0], q[1], q[2]);
+		Eigen::Matrix3d rx = quat.toRotationMatrix();
+		Eigen::Vector3d ea = rx.eulerAngles(2,1,0);
+		cout << "EulerAngel  x: " << ea[0]/3.14*180 << ", y: " << ea[1]/3.14*180 << ", z: "<< ea[2]/3.14*180 << endl;
+
+
+		// ::Eigen::Matrix3d R;
+		// R = ::Eigen::AngleAxisd(ea[0], ::Eigen::Vector3d::UnitZ())
+		// 	* ::Eigen::AngleAxisd(ea[1], ::Eigen::Vector3d::UnitY())
+		// 	* ::Eigen::AngleAxisd(ea[2], ::Eigen::Vector3d::UnitX());
+		::Eigen::Quaterniond quaternion = Eigen::AngleAxisd(ea[0], ::Eigen::Vector3d::UnitZ()) *
+											Eigen::AngleAxisd(ea[2], ::Eigen::Vector3d::UnitY()) *
+											Eigen::AngleAxisd(ea[1], ::Eigen::Vector3d::UnitX());
+
+		vector<float> quat_world2cam{  0,0,0,1  };
+		vector<float> quat_rotated = QuaternionDotProduct(vector<float>{-q[0],-q[1],-q[2],q[3]},quat_world2cam);
+
+		camera_pose.orientation.x = quaternion.x(); //quat_rotated[0];
+		camera_pose.orientation.y = quaternion.y(); //quat_rotated[1];
+		camera_pose.orientation.z = quaternion.z(); //quat_rotated[2];
+		camera_pose.orientation.w = quaternion.w(); //quat_rotated[3];
 		
 		geometry_msgs::PoseStamped camera_posestamped;
 		camera_posestamped.pose = camera_pose;
-		camera_posestamped.header.frame_id = "map";
+		camera_posestamped.header.frame_id = map_frame_id_param_; //"map""
 		camera_posestamped.header.stamp = ros::Time::now();
-		pub_cur_camera_pose.publish(camera_posestamped);
+		pub_cam_pose.publish(camera_posestamped);
 		//Modify Map points nearby camear by the way
 		// FilterNearbyPoint(SLAM.getMap(),std::vector<float>{twc.at<float>(0),twc.at<float>(1),twc.at<float>(2)});
 	}
@@ -433,7 +486,7 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg){
 		return;
 	}
 	SLAM.TrackMonocular(cv_ptr->image, cv_ptr->header.stamp.toSec());
-	publish(SLAM, pub_pts_and_pose, pub_all_kf_and_pts, pub_cur_camera_pose, frame_id);
+	publish(SLAM, pub_pts_and_pose, pub_all_kf_and_pts, pub_cam_pose, frame_id);
 	++frame_id;
 }
 
@@ -445,6 +498,7 @@ bool parseParams(int argc, char **argv) {
 	if (isInteger(std::string(argv[3]))) {
 		int camera_id = atoi(argv[3]);
 		if (camera_id >= 0){
+			read_from_topic = false;
 			read_from_camera = true;
 			printf("Reading images from camera with id %d\n", camera_id);
 			cap_obj.open(camera_id);
@@ -467,6 +521,8 @@ bool parseParams(int argc, char **argv) {
 	}
 	else {
 		LoadImages(string(argv[3]), vstrImageFilenames, vTimestamps);
+		read_from_topic = false;
+		read_from_camera = false;
 	}
 	if (argc >= 5) {
 		all_pts_pub_gap = atoi(argv[4]);
@@ -475,6 +531,63 @@ bool parseParams(int argc, char **argv) {
 	return 1;
 }
 
+bool getRosParams(ros::NodeHandle &node_handle_) {
+	std::string name_of_node_ = ros::this_node::getName();
+	node_handle_.param<std::string>(name_of_node_+ "/pointcloud_frame_id", map_frame_id_param_, "map");
+	node_handle_.param<std::string>(name_of_node_+ "/camera_frame_id", camera_frame_id_param_, "camera_link");
+	// node_handle_.param<std::string>(name_of_node_ + "/map_file", map_file_name_param_, "map.bin");
+	node_handle_.param(name_of_node_ + "/bUseViewer", bUseViewer_, true);
+	// node_handle_.param(name_of_node_ + "/read_from_topic", read_from_topic, true);
+}
 
+vector<float> QuaternionDotProduct(vector<float> q1,vector<float> q2){
+	// quaternion format is [x,y,z,w]
+	float x1=q1[0];
+	float y1=q1[1];
+	float z1=q1[2];
+	float w1=q1[3];
+	float x2=q2[0];
+	float y2=q2[1];
+	float z2=q2[2];
+	float w2=q2[3];
+	return vector<float>{		
+		w1*x2 + x1*w2 + y1*z2 - z1*y2,
+		w1*y2 - x1*z2 + y1*w2 + z1*x2,
+		w1*z2 + x1*y2 - y1*x2 + z1*w2,
+		w1*w2 - x1*x2 - y1*y2 - z1*z2
+	};
+}
 
+geometry_msgs::Pose TransformtoWorld(geometry_msgs::Pose camera_pose){
+	Eigen::Quaterniond quat_cam(camera_pose.orientation.w, camera_pose.orientation.x, camera_pose.orientation.y, camera_pose.orientation.z);
+	Eigen::Matrix3d mat_cam = quat_cam.matrix();
+	Eigen::Matrix<double,1,3> vec_cam(camera_pose.position.x, camera_pose.position.y, camera_pose.position.z);
+	Eigen::Matrix4d trans_cam = Eigen::Matrix4d::Zero();
+	trans_cam.topLeftCorner<3,3>() = mat_cam;
+	trans_cam.topRightCorner<3,1>() = vec_cam;
+	trans_cam[-1,-1] = 1;
 
+	float angles[3]{0,90,-90}; 
+	Eigen::Vector3d eulerAngle(angles[0] * M_PI / 180 , angles[1] * M_PI / 180 , -angles[2] * M_PI / 180);
+	Eigen::AngleAxisd rollAngle(Eigen::AngleAxisd(eulerAngle(2),Eigen::Vector3d::UnitX()));
+	Eigen::AngleAxisd pitchAngle(Eigen::AngleAxisd(eulerAngle(1),Eigen::Vector3d::UnitY()));
+	Eigen::AngleAxisd yawAngle(Eigen::AngleAxisd(eulerAngle(0),Eigen::Vector3d::UnitZ()));
+	Eigen::Matrix3d mat_rotate;
+	mat_rotate = yawAngle * pitchAngle * rollAngle;
+	Eigen::Matrix4d trans_rotate = Eigen::Matrix4d::Zero();
+	trans_rotate.topLeftCorner<3,3>() = mat_rotate;
+	trans_rotate[-1,-1] = 1;
+
+	Eigen::Matrix4d trans_rectified = trans_rotate * trans_cam;
+	Eigen::Matrix3d mat_rectified = trans_rectified.topLeftCorner<3,3>();
+	Eigen::Quaterniond quat_rectified(mat_rectified);
+	geometry_msgs::Pose pose;
+	pose.orientation.w = quat_rectified.w();
+	pose.orientation.x = quat_rectified.x();
+	pose.orientation.y = quat_rectified.y();
+	pose.orientation.z = quat_rectified.z();
+	pose.position.x = trans_rectified[3,0];
+	pose.position.y = trans_rectified[3,1];
+	pose.position.z = trans_rectified[3,2];
+	return pose;
+}

@@ -2,13 +2,15 @@
         "version": "0.2.0",
         "configurations": [
             {
-                "name": "orb_slam2_ros_rgbd",
+                "name": "Monopub",
                 "type": "cppdbg",
                 "request": "launch",
-                "program": "${workspaceFolder}/devel/.private/orb_slam2_ros/lib/orb_slam2_ros/orb_slam2_ros_rgbd",
+                "program": "${workspaceFolder}/Examples/ROS/ORB_SLAM2/Monopub",
+                // "program": "${workspaceFolder}/devel/.private/orb_slam2_ros/lib/orb_slam2_ros/orb_slam2_ros_rgbd",
                 "args": [
-                    "_model:=RS16",
-                    "_resolution_type:=1.0cm"
+                    "/home/gxx/WorkSpace/ORB_SLAM2/Vocabulary/ORBvoc.txt",
+                    "/home/gxx/WorkSpace/ORB_SLAM2/Examples/Monocular/KITTI00-02.yaml",
+                    "/home/gxx/WorkSpace/1Dataset/data_odometry_gray/dataset/sequences/00"
                 ],
                 "stopAtEntry": false,
                 "cwd": "${workspaceFolder}",

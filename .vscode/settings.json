@@ -65,6 +65,8 @@
                 "random": "cpp",
                 "set": "cpp",
                 "string": "cpp",
-                "string_view": "cpp"
+                "string_view": "cpp",
+                "*.txx": "cpp",
+                "core": "cpp"
         }
 }
