@@ -386,20 +386,21 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud_(new pcl::PointCloud<pcl::PointXYZ
 		camera_pose.orientation.z = q[2];
 		camera_pose.orientation.w = q[3];		
 				
-		// camera_pose.position.x = twc.at<float>(0);
-		// camera_pose.position.y = twc.at<float>(1);
-		// camera_pose.position.z = twc.at<float>(2);
+		camera_pose.position.x = twc.at<float>(0);
+		camera_pose.position.y = twc.at<float>(1);
+		camera_pose.position.z = twc.at<float>(2);
 		// transform camera_pose from camera coordinate to world coordinate.
-		camera_pose.position.x = twc.at<float>(2);
-		camera_pose.position.y = -twc.at<float>(0);
-		camera_pose.position.z = -twc.at<float>(1);
+		// camera_pose.position.x = twc.at<float>(2);
+		// camera_pose.position.y = -twc.at<float>(0);
+		// camera_pose.position.z = -twc.at<float>(1);
+		// cout << "before rotation" << camera_pose.position.x << " " << camera_pose.position.y << " " << camera_pose.position.z << " " << endl;
 
 		geometry_msgs::PoseStamped camera_posestamped_;
 		camera_posestamped_.pose = camera_pose;
 		camera_posestamped_.header.frame_id = map_frame_id_param_; //"map""
 		camera_posestamped_.header.stamp = ros::Time::now();
 		pub_cam_pose_.publish(camera_posestamped_);
-
+/*
 		Eigen::Quaterniond quat(q[3], q[0], q[1], q[2]);
 		Eigen::Matrix3d rx = quat.toRotationMatrix();
 		Eigen::Vector3d ea = rx.eulerAngles(2,1,0);
@@ -421,9 +422,11 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud_(new pcl::PointCloud<pcl::PointXYZ
 		camera_pose.orientation.y = quaternion.y(); //quat_rotated[1];
 		camera_pose.orientation.z = quaternion.z(); //quat_rotated[2];
 		camera_pose.orientation.w = quaternion.w(); //quat_rotated[3];
-		
+*/		
+		geometry_msgs::Pose pose = TransformtoWorld(camera_pose);
+		// cout << "after rotation" << pose.position.x << " " << pose.position.y << " " << pose.position.z << " " << endl;
 		geometry_msgs::PoseStamped camera_posestamped;
-		camera_posestamped.pose = camera_pose;
+		camera_posestamped.pose = pose;//camera_pose;
 		camera_posestamped.header.frame_id = map_frame_id_param_; //"map""
 		camera_posestamped.header.stamp = ros::Time::now();
 		pub_cam_pose.publish(camera_posestamped);
@@ -565,18 +568,21 @@ geometry_msgs::Pose TransformtoWorld(geometry_msgs::Pose camera_pose){
 	Eigen::Matrix4d trans_cam = Eigen::Matrix4d::Zero();
 	trans_cam.topLeftCorner<3,3>() = mat_cam;
 	trans_cam.topRightCorner<3,1>() = vec_cam;
-	trans_cam[-1,-1] = 1;
-
-	float angles[3]{0,90,-90}; 
-	Eigen::Vector3d eulerAngle(angles[0] * M_PI / 180 , angles[1] * M_PI / 180 , -angles[2] * M_PI / 180);
-	Eigen::AngleAxisd rollAngle(Eigen::AngleAxisd(eulerAngle(2),Eigen::Vector3d::UnitX()));
+	trans_cam(-1,-1) = 1;
+	
+	float angles[3]{-90,0,-90}; // xyz
+	Eigen::Vector3d eulerAngle(angles[0] * M_PI / 180 , angles[1] * M_PI / 180 , angles[2] * M_PI / 180);
+	Eigen::AngleAxisd rollAngle(Eigen::AngleAxisd(eulerAngle(0),Eigen::Vector3d::UnitX()));
 	Eigen::AngleAxisd pitchAngle(Eigen::AngleAxisd(eulerAngle(1),Eigen::Vector3d::UnitY()));
-	Eigen::AngleAxisd yawAngle(Eigen::AngleAxisd(eulerAngle(0),Eigen::Vector3d::UnitZ()));
+	Eigen::AngleAxisd yawAngle(Eigen::AngleAxisd(eulerAngle(2),Eigen::Vector3d::UnitZ()));
 	Eigen::Matrix3d mat_rotate;
 	mat_rotate = yawAngle * pitchAngle * rollAngle;
 	Eigen::Matrix4d trans_rotate = Eigen::Matrix4d::Zero();
 	trans_rotate.topLeftCorner<3,3>() = mat_rotate;
-	trans_rotate[-1,-1] = 1;
+	trans_rotate(3,3) = 1;
+
+	// cout << "mat_rotate: \n" << mat_rotate << endl;
+	// cout << "trans_rotate: \n" << trans_rotate << endl;
 
 	Eigen::Matrix4d trans_rectified = trans_rotate * trans_cam;
 	Eigen::Matrix3d mat_rectified = trans_rectified.topLeftCorner<3,3>();
@@ -586,8 +592,8 @@ geometry_msgs::Pose TransformtoWorld(geometry_msgs::Pose camera_pose){
 	pose.orientation.x = quat_rectified.x();
 	pose.orientation.y = quat_rectified.y();
 	pose.orientation.z = quat_rectified.z();
-	pose.position.x = trans_rectified[3,0];
-	pose.position.y = trans_rectified[3,1];
-	pose.position.z = trans_rectified[3,2];
+	pose.position.x = trans_rectified(0,3);
+	pose.position.y = trans_rectified(1,3);
+	pose.position.z = trans_rectified(2,3);
 	return pose;
 }
