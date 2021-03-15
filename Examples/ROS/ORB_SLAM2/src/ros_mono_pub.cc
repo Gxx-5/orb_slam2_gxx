@@ -25,7 +25,7 @@
 #include <time.h>
 #include <iomanip>
 
-#include "../lib/ros_pub.h"
+#include "../include/ros_pub.h"
 // #include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
 // #include "sensor_msgs/PointCloud.h"
@@ -93,7 +93,10 @@ int main(int argc, char **argv){
 	// Create SLAM system. It initializes all system threads and gets ready to process frames.
 	ORB_SLAM2::System SLAM(argv[1], argv[2], ORB_SLAM2::System::MONOCULAR, bUseViewer_);
 
-	init_publisher(nodeHandler);
+	pub_cloud = nodeHandler.advertise<sensor_msgs::PointCloud2>("/ros_cloud", 1000);
+        pub_pts_and_pose = nodeHandler.advertise<geometry_msgs::PoseArray>("pts_and_pose", 1000);
+        pub_all_kf_and_pts = nodeHandler.advertise<geometry_msgs::PoseArray>("all_kf_and_pts", 1000);
+        pub_cam_pose = nodeHandler.advertise<geometry_msgs::PoseStamped>("/cam_pose", 1000);
 
 	if (read_from_topic) {
 		ImageGrabber igb(SLAM, pub_pts_and_pose, pub_all_kf_and_pts, pub_cam_pose);
@@ -135,7 +138,7 @@ int main(int argc, char **argv){
 			cv::Mat curr_pose = SLAM.TrackMonocular(im, tframe);
 
 			// publish(SLAM, pub_pts_and_pose, pub_all_kf_and_pts, pub_cam_pose, frame_id);
-			publish(SLAM, frame_id);
+			publish(SLAM);
 
 			//cv::imshow("Press escape to exit", im);
 			//if (cv::waitKey(1) == 27) {
@@ -219,7 +222,7 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg){
 	}
 	SLAM.TrackMonocular(cv_ptr->image, cv_ptr->header.stamp.toSec());
 	// publish(SLAM, pub_pts_and_pose, pub_all_kf_and_pts, pub_cam_pose, frame_id);
-	publish(SLAM, frame_id);
+	publish(SLAM);
 	++frame_id;
 }
 
